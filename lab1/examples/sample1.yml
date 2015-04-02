@@ -1,0 +1,7 @@
+- Job :
+  - Name : "test-job"
+    Exec : "echo"
+    Args : ["-n","this is a test"]
+    Input : "stdin"
+    Output : "stdout"
+    Error : "stderr"
