@@ -1,0 +1,7 @@
+- Job :
+  - Name : "Example 2"
+    Exec : "./bin/sample2_src"
+    Args : ["10"]
+    Input : "stdin"
+    Output : "stdout"
+    Error : "stderr"
