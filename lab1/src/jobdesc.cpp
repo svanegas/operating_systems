@@ -15,6 +15,11 @@ const string ARGS_ATTR   = "Args";
 const string INPUT_ATTR  = "Input";
 const string OUTPUT_ATTR = "Output";
 const string ERROR_ATTR  = "Error";
+const string STD_IN      = "stdin";
+const string STD_OUT     = "stdout";
+const string STD_ERR     = "stderr";
+const string WRITE_MODE  = "w";
+const string READ_MODE   = "r";
 
 void trim(string &s) {
   int i = 0;
