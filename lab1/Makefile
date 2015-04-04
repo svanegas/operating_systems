@@ -16,7 +16,8 @@ run: build buildsamples
 
 build: clean $(SRCPATH)$(FILENAME).cpp $(SRCPATH)$(HEADER).cpp
 	@mkdir $(BINPATH)
-	@g++ $(SRCPATH)$(FILENAME).cpp $(SRCPATH)$(HEADER).cpp -o $(BINPATH)$(FILENAME)
+	@g++ $(SRCPATH)$(FILENAME).cpp $(SRCPATH)$(HEADER).cpp -o \
+			 $(BINPATH)$(FILENAME)
 
 buildsamples: cleansample2outerr $(EXAMPLESPATH)$(SAMPLE2SRC).cpp
 	@mkdir -p $(BINPATH)/2
