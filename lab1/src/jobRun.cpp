@@ -12,17 +12,36 @@ using namespace std;
 
 #define ERROR_OCURRED -1
 
+// If this is set to 1 the 'yaml-cpp' lib will be used, if is set to 2 the
+// custom YAML parse implementation will be used.
+int parseMode;
+
 /**
     Checks if the number of console arguments are correct. In case they are
     wrong a message is printed.
     @param argc Number of arguments of the program.
+    @param argv Command line arguments
     @return true if are correct, false otherwise.
  */
-bool checkArgs(int argc) {
-  if (argc != 2) {
+bool checkArgs(int argc, char** argv) {
+  // If we have 3 arguments we may be receiving a flag
+  if (argc == 3) {
+    // If the custom parse flag is set so we use the custom parsing method.
+    if (strcmp(argv[2], "-customparse") == 0) {
+      parseMode = CUSTOM_PARSE;
+      return true;
+    }
+    else {
+      puts("Usage: ./jobRun <yml-file> [-customparse]");
+      return false;
+    }
+  }
+  else if (argc != 2) {
     puts("Usage: ./jobRun <yml-file>");
     return false;
   }
+  // By default, a library for parsing the YAML file will be used.
+  parseMode = LIB_PARSE;
   return true;
 }
 
@@ -34,8 +53,8 @@ bool checkArgs(int argc) {
             otherwhise.
  */
 bool loadFile(job_desc &destination, char* fileName) {
-  if (!destination.loadFromYAML(destination, fileName)) {
-    puts("Could not open specified YAML file");
+  if (!destination.loadFromYAML(destination, fileName, parseMode)) {
+    puts("Could not load specified YAML file");
     return false;
   }
   return true;
@@ -97,7 +116,7 @@ void printResult(bool success, string jobName, int code, char * description) {
 int main (int argc, char **argv) {
   // Contains all data read and parse from YAML file.
   job_desc job;
-  if (!checkArgs(argc)) return 0;
+  if (!checkArgs(argc, argv)) return 0;
   if (!loadFile(job, argv[1])) return 0;
   // Process id to do fork.
   pid_t pid;

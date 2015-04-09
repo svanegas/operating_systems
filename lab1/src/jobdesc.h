@@ -5,6 +5,7 @@
 #include <vector>
 
 extern const int PARAMS_COUNT;
+extern const std::string JOB_ATTR;
 extern const std::string NAME_ATTR;
 extern const std::string EXEC_ATTR;
 extern const std::string ARGS_ATTR;
@@ -17,10 +18,13 @@ extern const std::string STD_ERR;
 extern const std::string WRITE_MODE;
 extern const std::string READ_MODE;
 
+const int LIB_PARSE = 1;
+const int CUSTOM_PARSE = 2;
+
 struct job_desc {
   std::string name, exec, input, output, error;
   std::vector <std::string> args;
-  bool loadFromYAML(job_desc &destination, char* fileName);
+  bool loadFromYAML(job_desc &destination, char* fileName, int parseMode);
 };
 
 #endif
