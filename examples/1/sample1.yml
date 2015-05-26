@@ -15,4 +15,8 @@ Pipes :
   - Name : "pipe1"
     Pipe : [ "job1","job2" ]
     input : "stdin"
-    output : "stdout"
+    output : "concha.out"
+  - Name : "pipe2"
+    Pipe : [ "job3","job4" ]
+    input : "stdin"
+    output : "vale.out"

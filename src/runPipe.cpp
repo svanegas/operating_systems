@@ -46,45 +46,6 @@ bool loadFile(vector<job_desc> &jobs, vector<pipe_desc> &pipes, char* fileName){
 }
 
 /**
-    Creates a copy of the respective file descriptors for input, output
-    and error streams. If those are specified as standard nothing is done.
-    @param job Reference to job_desc containing the input, output and error
-               file names.
-    @param inFile Pointer to input file.
-    @param outFile Pointer to output file.
-    @param errFile Pointer to error file.
-    @return true if the descriptors were succesfully copied, false
-            otherwhise.
- */
-bool setupStreamFiles(job_desc &job, FILE *inFile, FILE *outFile,
-                      FILE *errFile) {
-  /*if (job.input != STD_IN) {
-    if ((inFile = fopen(job.input.c_str(), READ_MODE.c_str())) == NULL) {
-      return false;
-    }
-    // dup2(oldfd, newfd) makes newfd be the copy of oldfd, closing newfd first
-    // if necessary.
-    if (dup2(fileno(inFile), STDIN_FILENO) == ERROR_OCURRED) return false;
-    close(fileno(inFile));
-  }
-  if (job.output != STD_OUT) {
-    if ((outFile = fopen(job.output.c_str(), WRITE_MODE.c_str())) == NULL) {
-      return false;
-    }
-    if (dup2(fileno(outFile), STDOUT_FILENO) == ERROR_OCURRED) return false;
-    close(fileno(outFile));
-  }
-  if (job.error != STD_ERR) {
-    if ((errFile = fopen(job.error.c_str(), WRITE_MODE.c_str())) == NULL) {
-      return false;
-    }
-    if (dup2(fileno(errFile), STDERR_FILENO) == ERROR_OCURRED) return false;
-    close(fileno(errFile));
-  }*/
-  return true;
-}
-
-/**
     Prints a message with the result of the execution of a process. It can be
     either successful or not.
     @param success true if is a success message, false otherwise.
@@ -97,27 +58,91 @@ void printResult(bool success, string jobName, int code) {
   else printf("unsuccessfully (Err: %d) ##\n", code);
 }
 
-void
-testDescriptors() {
-  puts("Normal");
-  int originalOutput = dup(STDOUT_FILENO);
-  close(STDOUT_FILENO);
-  int newOutput = open("hola.out", O_RDWR | O_CREAT);
-  puts("La concha");
-  close(STDOUT_FILENO);
-  dup2(originalOutput, STDOUT_FILENO);
-  close(originalOutput);
-  puts("Volví");
+int
+replaceFileDescriptor(int descriptor, const char *file, int flags) {
+  int originalDescriptor = dup(descriptor);
+  close(descriptor);
+  open(file, flags);
+  return originalDescriptor;
 }
 
-int main (int argc, char **argv) {
+void
+executeProcess(int *descriptors1, int *descriptors2, int jobIndex,
+               int jobsCount) {
+  close(descriptors1[0]);
+  close(descriptors1[1]);
+  close(descriptors2[0]);
+  close(descriptors2[1]);
+  printf("Soy el proceso id %d y hay %d\n", jobIndex, jobsCount);
+}
+
+void
+initializePipe(pipe_desc pipeToInit) {
+  int originalInput, originalOutput;
+  if (pipeToInit.input != STD_IN) {
+    originalInput = replaceFileDescriptor(STDIN_FILENO,
+                                          pipeToInit.input.c_str(), O_RDWR);
+  }
+  if (pipeToInit.output != STD_OUT) {
+    originalOutput = replaceFileDescriptor(STDOUT_FILENO,
+                                           pipeToInit.output.c_str(),
+                                           O_RDWR | O_CREAT);
+  }
+  // FORKS Y la vuelta aquí
+  // Creo las dos tuberías en el proceso padre, debería cerrarla en el hijo
+  // que no vaya a utilizar.
+  int descriptors1[2], descriptors2[2];
+  pipe(descriptors1);
+  pipe(descriptors2);
+  pid_t lastChild;
+  int jobsCount = pipeToInit.jobsIndexes.size();
+  for (int i = 0; i < jobsCount; ++i) {
+    lastChild = fork();
+    if (lastChild == -1) {
+      // TODO Fork failed
+    }
+    else if (lastChild == 0) {
+      executeProcess(descriptors1, descriptors2, pipeToInit.jobsIndexes[i],
+                     jobsCount);
+      exit(EXIT_SUCCESS);
+    }
+    else {
+      // Soy el padre.
+    }
+  }
+  close(descriptors1[0]);
+  close(descriptors1[1]);
+  close(descriptors2[0]);
+  close(descriptors2[1]);
+  int status;
+  waitpid(lastChild, &status, 0);
+  /*int x;
+  scanf("%d", &x);
+  printf("%d\n", x + 10);*/
+}
+
+int
+main(int argc, char **argv) {
   // Contains all data read and parsed from YAML file.
   job_desc job;
   vector <job_desc> jobs;
   vector <pipe_desc> pipes;
   if (!checkArgs(argc)) return 0;
   if (!loadFile(jobs, pipes, argv[1])) return 0;
-  testDescriptors();
+  vector <pid_t> pipesCreators;
+  bool parent = true;
+  for (int i = 0; i < pipes.size() && parent; ++i) {
+    pid_t child = fork();
+    if (child != 0) pipesCreators.push_back(child);
+    else {
+      initializePipe(pipes[i]);
+      parent = false;
+    }
+  }
+  for (int i = 0; i < pipesCreators.size() && parent; ++i) {
+    int status;
+    waitpid(pipesCreators[i], &status, 0);
+  }
   return 0;
   /*// Process id to do fork.
   pid_t pid;
