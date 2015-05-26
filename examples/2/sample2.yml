@@ -1,0 +1,7 @@
+- Job :
+  - Name : "test-job-2"
+    Exec : "./bin/2/sample2_src"
+    Args : ["10"]
+    Input : "./examples/2/in.txt"
+    Output : "./examples/2/out.txt"
+    Error : "./examples/2/err.txt"
