@@ -8,6 +8,7 @@
 #include <cstring>
 #include <errno.h>
 #include <string>
+#include <set>
 #include "jobdesc.h"
 
 using namespace std;
@@ -35,8 +36,9 @@ bool checkArgs(int argc) {
     @return true if the given job_desc was filled successfully, false
             otherwhise.
  */
-bool loadFile(vector<job_desc> &jobs, vector<pipe_desc> &pipes, char* fileName){
-  if (!loadFromYAML(jobs, pipes, fileName)) {
+bool loadFile(vector<job_desc> &jobs, vector<pipe_desc> &pipes,
+              char* fileName, set <int> &assignedJobs) {
+  if (!loadFromYAML(jobs, pipes, fileName, assignedJobs)) {
     string errorMessage = "An error ocurred while trying to load and parse";
     errorMessage += " the specified YAML file";
     printf("%s\n", errorMessage.c_str());
@@ -58,8 +60,7 @@ void printResult(bool success, string pipeName, int code) {
   else printf("unsuccessfully (Err: %d) ##\n", code);
 }
 
-int
-replaceFileDescriptor(int descriptor, const char *file, int flags) {
+int replaceFileDescriptor(int descriptor, const char *file, int flags) {
   int originalDescriptor = dup(descriptor);
   if (originalDescriptor == ERROR_OCURRED) return ERROR_OCURRED;
   if (close(descriptor) == ERROR_OCURRED) return ERROR_OCURRED;
@@ -67,32 +68,22 @@ replaceFileDescriptor(int descriptor, const char *file, int flags) {
   return originalDescriptor;
 }
 
-bool
-isOpen(int fd) {
+bool isOpen(int fd) {
   return fd != FD_CLOSED;
 }
 
-void
-closeFileDescriptor(int &fd) {
+void closeFileDescriptor(int &fd) {
   close(fd);
   fd = FD_CLOSED;
 }
 
-bool
-setupPipeDescriptor(int pipeDescriptor, int fdToReplace) {
-  if (dup2(pipeDescriptor, fdToReplace) == ERROR_OCURRED) {
-    puts("false");
-    return false;
-  }
-  if (close(pipeDescriptor) == ERROR_OCURRED) {
-    puts("false");
-    return false;
-  }
+bool setupPipeDescriptor(int pipeDescriptor, int fdToReplace) {
+  if (dup2(pipeDescriptor, fdToReplace) == ERROR_OCURRED) return false;
+  if (close(pipeDescriptor) == ERROR_OCURRED) return false;
   return true;
 }
 
-bool
-waitForChildren(vector <pid_t> &children) {
+bool waitForChildren(vector <pid_t> &children) {
   for (int i = 0; i < children.size(); ++i) {
     pid_t pid = children[i];
     int status;
@@ -112,7 +103,6 @@ waitForChildren(vector <pid_t> &children) {
         // terminate.
         int signalCode = WTERMSIG(status);
         errno = signalCode;
-        puts("false");
         return false;
       }
     }
@@ -120,9 +110,21 @@ waitForChildren(vector <pid_t> &children) {
   return true;
 }
 
-bool
-executeProcess(int descriptor[2][2], int jobPosition,
-               int jobsCount, job_desc job) {
+pipe_desc buildDefaultPipe(int jobCount, set <int> &assignedJobs) {
+  pipe_desc defaultPipe;
+  defaultPipe.name = DEFAULT_PIPE;
+  defaultPipe.input = STD_IN;
+  defaultPipe.output = STD_OUT;
+  for (int i = 0; i < jobCount; ++i) {
+    if (assignedJobs.count(i) == 0) {
+      defaultPipe.jobsIndexes.push_back(i);
+    }
+  }
+  return defaultPipe;
+}
+
+bool executeProcess(int descriptor[2][2], int jobPosition, int jobsCount,
+                    job_desc job) {
   // Even processes don't read from first pipe descriptor neither write to
   // second pipe descriptor.
   if (jobPosition % 2 == 0) {
@@ -194,9 +196,7 @@ executeProcess(int descriptor[2][2], int jobPosition,
   printf("%s\n", job.exec.c_str());*/
 }
 
-bool
-initializePipe(pipe_desc pipeToInit, vector <job_desc> &jobs) {
-  printf("## Output %s ##\n", pipeToInit.name.c_str());
+bool initializePipe(pipe_desc pipeToInit, vector <job_desc> &jobs) {
   int originalInput, originalOutput;
   if (pipeToInit.input != STD_IN) {
     originalInput = replaceFileDescriptor(STDIN_FILENO,
@@ -216,13 +216,14 @@ initializePipe(pipe_desc pipeToInit, vector <job_desc> &jobs) {
   if (pipe(descriptor[FIRST_PIPE_FD]) == ERROR_OCURRED) return false;
   if (pipe(descriptor[SECOND_PIPE_FD]) == ERROR_OCURRED) return false;
 
-  vector <pid_t> childJobs;
+  //vector <pid_t> childJobs;
+  pid_t lastJob;
   int jobsCount = pipeToInit.jobsIndexes.size();
   for (int i = 0; i < jobsCount; ++i) {
     pid_t currentChild;
     int jobIndex;
     job_desc currentJob;
-    switch ((currentChild = fork())) {
+    switch (currentChild = fork()) {
       case ERROR_OCURRED:
         return false;
       case 0:
@@ -232,7 +233,8 @@ initializePipe(pipe_desc pipeToInit, vector <job_desc> &jobs) {
         else exit(EXIT_SUCCESS);
         break;
       default:
-        childJobs.push_back(currentChild);
+        //childJobs.push_back(currentChild);
+        lastJob = currentChild;
         break;
     }
   }
@@ -241,7 +243,46 @@ initializePipe(pipe_desc pipeToInit, vector <job_desc> &jobs) {
   closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDIN_FILENO]);
   closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDOUT_FILENO]);
 
-  return waitForChildren(childJobs);
+  vector <pid_t> lastJobInVector(1, lastJob);
+  return waitForChildren(lastJobInVector);
+}
+
+void analyzePipeResults(pid_t exitedPipeId, string pipeName) {
+  int status;
+  if (waitpid(exitedPipeId, &status, 0) == exitedPipeId) {
+    // Returns true if the child terminated normally.
+    if (WIFEXITED(status)) {
+      // Returns the exit status of the child.
+      int code = WEXITSTATUS(status);
+      if (code != EXIT_SUCCESS) {
+        printResult(false, pipeName, code);
+      }
+      else printResult(true, pipeName, code);
+    }
+    // Returns true if the child process was terminated by a signal.
+    else if (WIFSIGNALED(status)) {
+      // Returns the number of the signal that caused the child process to
+      // terminate.
+      int signalCode = WTERMSIG(status);
+      printResult(false, pipeName, signalCode);
+    }
+  }
+}
+
+pid_t forkToCreatePipe(pipe_desc pipeToCreate, vector <job_desc> &jobs) {
+  pid_t child;
+  printf("## Output %s ##\n", pipeToCreate.name.c_str());
+  switch (child = fork()) {
+    case ERROR_OCURRED:
+      // An error ocurred while trying to fork.
+      printResult(false, pipeToCreate.name, errno);
+      break;
+    case 0:
+      if (!initializePipe(pipeToCreate, jobs)) exit(errno);
+      else exit(EXIT_SUCCESS);
+    break;
+  }
+  return child;
 }
 
 int
@@ -250,46 +291,25 @@ main(int argc, char **argv) {
   job_desc job;
   vector <job_desc> jobs;
   vector <pipe_desc> pipes;
+  set <int> assignedJobs;
   if (!checkArgs(argc)) return 0;
-  if (!loadFile(jobs, pipes, argv[1])) return 0;
+  if (!loadFile(jobs, pipes, argv[1], assignedJobs)) return 0;
   vector <pid_t> pipeCreators;
   for (int i = 0; i < pipes.size(); ++i) {
-    pid_t child;
-    switch (child = fork()) {
-      case ERROR_OCURRED:
-        // An error ocurred while trying to fork.
-        break;
-      case 0:
-        if (!initializePipe(pipes[i], jobs)) exit(errno);
-        else exit(EXIT_SUCCESS);
-      default:
-        pipeCreators.push_back(child);
-        break;
-    }
+    pid_t child = forkToCreatePipe(pipes[i], jobs);
+    if (child > 0) pipeCreators.push_back(child);
   }
   for (int i = 0; i < pipeCreators.size(); ++i) {
     pipe_desc exitedPipe = pipes[i];
     pid_t exitedPipeId = pipeCreators[i];
     int status;
-    if (waitpid(exitedPipeId, &status, 0) == exitedPipeId) {
-      // Returns true if the child terminated normally.
-      if (WIFEXITED(status)) {
-        // Returns the exit status of the child.
-        int code = WEXITSTATUS(status);
-        if (code != EXIT_SUCCESS) {
-          printResult(false, exitedPipe.name, code);
-        }
-        else printResult(true, exitedPipe.name, code);
-      }
-      // Returns true if the child process was terminated by a signal.
-      else if (WIFSIGNALED(status)) {
-        // Returns the number of the signal that caused the child process to
-        // terminate.
-        int signalCode = WTERMSIG(status);
-        printResult(false, exitedPipe.name, signalCode);
-      }
-    }
+    analyzePipeResults(exitedPipeId, exitedPipe.name);
   }
+
+  pipe_desc defaultPipe = buildDefaultPipe(jobs.size(), assignedJobs);
+  pid_t defaultPipeChild = forkToCreatePipe(defaultPipe, jobs);
+  analyzePipeResults(defaultPipeChild, defaultPipe.name);
+
   return 0;
   /*// Process id to do fork.
   pid_t pid;

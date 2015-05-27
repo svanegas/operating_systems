@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <map>
+#include <set>
 #include "jobdesc.h"
 #include "yaml-cpp/yaml.h"
 
@@ -11,21 +12,22 @@ using namespace std;
 
 const int PARAMS_COUNT   = 6;
 
-const string JOBS_ATTR   = "Jobs";
-const string PIPES_ATTR  = "Pipes";
-const string PIPE_ATTR   = "Pipe";
-const string NAME_ATTR   = "Name";
-const string EXEC_ATTR   = "Exec";
-const string ARGS_ATTR   = "Args";
-const string INPUT_ATTR  = "input";
-const string OUTPUT_ATTR = "output";
-const string STD_IN      = "stdin";
-const string STD_OUT     = "stdout";
-const string WRITE_MODE  = "w";
-const string READ_MODE   = "r";
-const int FD_CLOSED      = -1;
-const int FIRST_PIPE_FD  = 0;
-const int SECOND_PIPE_FD = 1;
+const string JOBS_ATTR    = "Jobs";
+const string PIPES_ATTR   = "Pipes";
+const string PIPE_ATTR    = "Pipe";
+const string NAME_ATTR    = "Name";
+const string EXEC_ATTR    = "Exec";
+const string ARGS_ATTR    = "Args";
+const string INPUT_ATTR   = "input";
+const string OUTPUT_ATTR  = "output";
+const string STD_IN       = "stdin";
+const string STD_OUT      = "stdout";
+const string WRITE_MODE   = "w";
+const string READ_MODE    = "r";
+const string DEFAULT_PIPE = "default-pipe";
+const int FD_CLOSED       = -1;
+const int FIRST_PIPE_FD   = 0;
+const int SECOND_PIPE_FD  = 1;
 
 /**
   Method that uses 'yaml-cpp' library to parse a YAML file and fill a vector of
@@ -63,7 +65,7 @@ bool parseJobs(vector <job_desc> &jobs, YAML::Node &rootNode,
 }
 
 bool parsePipes(vector <pipe_desc> &pipes, YAML::Node &rootNode,
-                map <string, int> &jobIndexByName) {
+                map <string, int> &jobIndexByName, set <int> &assignedJobs) {
   YAML::Node pipesNode;
   if (!(pipesNode = rootNode[PIPES_ATTR])) return false;
   for (YAML::const_iterator pipesIt = pipesNode.begin();
@@ -82,7 +84,9 @@ bool parsePipes(vector <pipe_desc> &pipes, YAML::Node &rootNode,
     for (int i = 0; i < pipeNode.size(); ++i) {
       string jobName = pipeNode[i].as<string>();
       // Get the index of the job in the map
-      currentPipe.jobsIndexes.push_back(jobIndexByName[jobName]);
+      int jobIndex = jobIndexByName[jobName];
+      currentPipe.jobsIndexes.push_back(jobIndex);
+      assignedJobs.insert(jobIndex);
     }
     pipes.push_back(currentPipe);
   }
@@ -91,10 +95,10 @@ bool parsePipes(vector <pipe_desc> &pipes, YAML::Node &rootNode,
 }
 
 bool loadFromYAML(vector <job_desc> &jobs, vector <pipe_desc> &pipes,
-                  char* fileName) {
+                  char* fileName, set <int> &assignedJobs) {
   YAML::Node rootNode = YAML::LoadFile(fileName);
   map <string, int> jobIndexByName;
   if (!parseJobs(jobs, rootNode, jobIndexByName)) return false;
-  if (!parsePipes(pipes, rootNode, jobIndexByName)) return false;
+  if (!parsePipes(pipes, rootNode, jobIndexByName, assignedJobs)) return false;
   return true;
 }

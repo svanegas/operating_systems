@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <set>
 
 extern const int PARAMS_COUNT;
 extern const std::string JOBS_ATTR;
@@ -16,6 +17,7 @@ extern const std::string STD_OUT;
 extern const std::string STD_ERR;
 extern const std::string WRITE_MODE;
 extern const std::string READ_MODE;
+extern const std::string DEFAULT_PIPE;
 extern const int FD_CLOSED;
 extern const int FIRST_PIPE_FD;
 extern const int SECOND_PIPE_FD;
@@ -32,6 +34,6 @@ struct pipe_desc {
 };
 
 bool loadFromYAML(std::vector <job_desc> &jobs, std::vector <pipe_desc> &pipes,
-                  char* fileName);
+                  char* fileName, std::set<int> &assignedJobs);
 
 #endif
