@@ -84,8 +84,9 @@ bool setupPipeDescriptor(int pipeDescriptor, int fdToReplace) {
 }
 
 bool waitForChildren(vector <pid_t> &children) {
+  pid_t pid;
   for (int i = 0; i < children.size(); ++i) {
-    pid_t pid = children[i];
+    pid = children[i];
     int status;
     if (waitpid(pid, &status, 0) == pid) {
       // Returns true if the child terminated normally.
@@ -247,6 +248,105 @@ bool initializePipe(pipe_desc pipeToInit, vector <job_desc> &jobs) {
   return waitForChildren(lastJobInVector);
 }
 
+
+
+bool executeProcessN(int descriptor[][2], int jobPosition, int jobsCount,
+                     job_desc job) {
+  // Take input from previous pipe if possible.
+  if (jobPosition > 0) {
+    closeFileDescriptor(descriptor[jobPosition - 1][STDOUT_FILENO]);
+    if (!setupPipeDescriptor(descriptor[jobPosition - 1][STDIN_FILENO],
+                             STDIN_FILENO)) return false;
+  }
+
+  // Write output to next pipe if possible.
+  int pipesCount = jobsCount - 1;
+  if (jobPosition != pipesCount) {
+    closeFileDescriptor(descriptor[jobPosition][STDIN_FILENO]);
+    if (!setupPipeDescriptor(descriptor[jobPosition][STDOUT_FILENO],
+                             STDOUT_FILENO)) return false;
+  }
+
+  // Array that contains: [job name, args..., NULL].
+  char *jobArgs [job.args.size() + 2];
+  jobArgs[0] = (char *) job.exec.c_str();
+  for (int i = 1; i <= job.args.size(); ++i) {
+    jobArgs[i] = (char *) job.args[i - 1].c_str();
+  }
+  // "The list of arguments must be terminated by a NULL pointer, and, since
+  // these are variadic functions, this pointer must be cast (char *) NULL."
+  jobArgs[job.args.size() + 1] = NULL;
+
+  if (execvp(jobArgs[0], jobArgs) == ERROR_OCURRED) return false;
+  else return true;
+}
+
+bool initializePipeN(pipe_desc pipeToInit, vector <job_desc> &jobs) {
+  int originalInput, originalOutput;
+  if (pipeToInit.input != STD_IN) {
+    originalInput = replaceFileDescriptor(STDIN_FILENO,
+                                          pipeToInit.input.c_str(), O_RDWR);
+    if (originalInput == ERROR_OCURRED) return false;
+  }
+  if (pipeToInit.output != STD_OUT) {
+    originalOutput = replaceFileDescriptor(STDOUT_FILENO,
+                                           pipeToInit.output.c_str(),
+                                           O_RDWR | O_CREAT);
+    if (originalOutput == ERROR_OCURRED) return false;
+  }
+  // FORKS Y la vuelta aquí
+  int jobsCount = pipeToInit.jobsIndexes.size();
+  // If the pipe doesn't have any associated job so we're done.
+  if (jobsCount == 0) return true;
+
+  // Prepare n - 1 file descriptors, in each child we should close those that
+  // are not needed.
+  int pipesCount = jobsCount - 1;
+  int descriptor[pipesCount][2];
+
+  pid_t lastJob;
+  for (int i = 0; i < jobsCount; ++i) {
+    // If the current job is not the last one, create the pipe that follows it
+    if (i != jobsCount - 1) {
+      if (pipe(descriptor[i]) == ERROR_OCURRED) return false;
+    }
+    // We can close second previous pipe if it is valid because we won't use
+    // it anymore.
+    if (i - 2 >= 0) {
+      closeFileDescriptor(descriptor[i - 2][STDIN_FILENO]);
+      closeFileDescriptor(descriptor[i - 2][STDOUT_FILENO]);
+    }
+    pid_t currentChild;
+    int jobIndex;
+    job_desc currentJob;
+    switch (currentChild = fork()) {
+      case ERROR_OCURRED:
+        return false;
+      case 0:
+        jobIndex = pipeToInit.jobsIndexes[i];
+        currentJob = jobs[jobIndex];
+        if (!executeProcessN(descriptor, i, jobsCount, currentJob)) exit(errno);
+        else exit(EXIT_SUCCESS);
+        break;
+      default:
+        lastJob = currentChild;
+        break;
+    }
+  }
+
+  for (int i = 0; i < pipesCount; ++i) {
+    if (isOpen(descriptor[i][STDIN_FILENO])) {
+      closeFileDescriptor(descriptor[i][STDIN_FILENO]);
+    }
+    if (isOpen(descriptor[i][STDOUT_FILENO])) {
+      closeFileDescriptor(descriptor[i][STDOUT_FILENO]);
+    }
+  }
+
+  vector <pid_t> lastJobInVector(1, lastJob);
+  return waitForChildren(lastJobInVector);
+}
+
 void analyzePipeResults(pid_t exitedPipeId, string pipeName) {
   int status;
   if (waitpid(exitedPipeId, &status, 0) == exitedPipeId) {
@@ -278,7 +378,8 @@ pid_t forkToCreatePipe(pipe_desc pipeToCreate, vector <job_desc> &jobs) {
       printResult(false, pipeToCreate.name, errno);
       break;
     case 0:
-      if (!initializePipe(pipeToCreate, jobs)) exit(errno);
+      //if (!initializePipe(pipeToCreate, jobs)) exit(errno);
+      if (!initializePipeN(pipeToCreate, jobs)) exit(errno);
       else exit(EXIT_SUCCESS);
     break;
   }

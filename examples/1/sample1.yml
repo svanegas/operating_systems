@@ -11,21 +11,21 @@ Jobs :
   - Name : "job4"
     Exec : "head"
     Args : []
-#  - Name : "wc"
-#    Exec : "wc"
-#    Args : []
+  - Name : "wc"
+    Exec : "wc"
+    Args : []
 #  - Name : "cat"
 #    Exec : "cat"
 #    Args : []
 #  - Name : "job7"
 #    Exec : "echo"
 #    Args : ["La", "puta","lora"]
-#  - Name : "wc2"
-#    Exec : "wc"
-#    Args : []
+  - Name : "wc2"
+    Exec : "wc"
+    Args : []
 Pipes :
   - Name : "pipe1"
-    Pipe : [ "job1","job2"]
+    Pipe : [ "job1", "job2", "wc", "wc2"]
     input : "stdin"
     output : "stdout"
 #  - Name : "pipe2"
