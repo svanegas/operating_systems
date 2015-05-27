@@ -11,12 +11,18 @@ Jobs :
   - Name : "job4"
     Exec : "head"
     Args : []
+  - Name : "wc"
+    Exec : "wc"
+    Args : []
+  - Name : "cat"
+    Exec : "cat"
+    Args : []
 Pipes :
   - Name : "pipe1"
-    Pipe : [ "job1","job2" ]
+    Pipe : [ "job1","job2"]
     input : "stdin"
-    output : "concha.out"
+    output : "stdout"
   - Name : "pipe2"
     Pipe : [ "job3","job4" ]
     input : "stdin"
-    output : "vale.out"
+    output : "stdout"

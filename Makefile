@@ -13,7 +13,7 @@ all: build
 
 run: build #buildsamples
 	@$(BINPATH)$(FILENAME) $(EXAMPLESPATH)$(SAMPLE1)
-	#@$(BINPATH)$(FILENAME) $(EXAMPLESPATH)$(SAMPLE2)
+	@#$(BINPATH)$(FILENAME) $(EXAMPLESPATH)$(SAMPLE2)
 
 build: clean $(SRCPATH)$(FILENAME).cpp $(SRCPATH)$(HEADER).cpp
 	@mkdir $(BINPATH)

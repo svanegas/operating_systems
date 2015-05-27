@@ -52,8 +52,8 @@ bool loadFile(vector<job_desc> &jobs, vector<pipe_desc> &pipes, char* fileName){
     @param jobName Name of the executed job.
     @param code Response code given by the status or signal.
  */
-void printResult(bool success, string jobName, int code) {
-  printf("\n## %s finished ", jobName.c_str());
+void printResult(bool success, string pipeName, int code) {
+  printf("## %s finished ", pipeName.c_str());
   if (success) printf("successfully ##\n");
   else printf("unsuccessfully (Err: %d) ##\n", code);
 }
@@ -61,64 +61,187 @@ void printResult(bool success, string jobName, int code) {
 int
 replaceFileDescriptor(int descriptor, const char *file, int flags) {
   int originalDescriptor = dup(descriptor);
-  close(descriptor);
-  open(file, flags);
+  if (originalDescriptor == ERROR_OCURRED) return ERROR_OCURRED;
+  if (close(descriptor) == ERROR_OCURRED) return ERROR_OCURRED;
+  if (open(file, flags) == ERROR_OCURRED) return ERROR_OCURRED;
   return originalDescriptor;
 }
 
-void
-executeProcess(int *descriptors1, int *descriptors2, int jobIndex,
-               int jobsCount) {
-  close(descriptors1[0]);
-  close(descriptors1[1]);
-  close(descriptors2[0]);
-  close(descriptors2[1]);
-  printf("Soy el proceso id %d y hay %d\n", jobIndex, jobsCount);
+bool
+isOpen(int fd) {
+  return fd != FD_CLOSED;
 }
 
 void
-initializePipe(pipe_desc pipeToInit) {
+closeFileDescriptor(int &fd) {
+  close(fd);
+  fd = FD_CLOSED;
+}
+
+bool
+setupPipeDescriptor(int pipeDescriptor, int fdToReplace) {
+  if (dup2(pipeDescriptor, fdToReplace) == ERROR_OCURRED) {
+    puts("false");
+    return false;
+  }
+  if (close(pipeDescriptor) == ERROR_OCURRED) {
+    puts("false");
+    return false;
+  }
+  return true;
+}
+
+bool
+waitForChildren(vector <pid_t> &children) {
+  for (int i = 0; i < children.size(); ++i) {
+    pid_t pid = children[i];
+    int status;
+    if (waitpid(pid, &status, 0) == pid) {
+      // Returns true if the child terminated normally.
+      if (WIFEXITED(status)) {
+        // Returns the exit status of the child.
+        int code = WEXITSTATUS(status);
+        if (code != EXIT_SUCCESS) {
+          errno = code;
+          return false;
+        }
+      }
+      // Returns true if the child process was terminated by a signal.
+      else if (WIFSIGNALED(status)) {
+        // Returns the number of the signal that caused the child process to
+        // terminate.
+        int signalCode = WTERMSIG(status);
+        errno = signalCode;
+        puts("false");
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool
+executeProcess(int descriptor[2][2], int jobPosition,
+               int jobsCount, job_desc job) {
+  // Even processes don't read from first pipe descriptor neither write to
+  // second pipe descriptor.
+  if (jobPosition % 2 == 0) {
+    closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDIN_FILENO]);
+    closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDOUT_FILENO]);
+  }
+  // Odd processes don't read from second pipe descriptor neither write to
+  // first pipe descriptor.
+  else if (jobPosition % 2 == 1) {
+    closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDOUT_FILENO]);
+    closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDIN_FILENO]);
+  }
+  // First process is supposed to read from second pipe descriptor because it
+  // is even, but it shouldn't read from a pipe descriptor.
+  if (jobPosition == 0) {
+    closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDIN_FILENO]);
+  }
+  // Last process is supposed to write to a pipe descriptor because it
+  // is even or odd, but it shouldn't write to a pipe descriptor.
+  if (jobPosition == jobsCount - 1) {
+    // If last is even, it was supposed to write in first pipe descriptor.
+    if (jobPosition % 2 == 0) {
+      closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDOUT_FILENO]);
+    }
+    // If last is odd, it was supposed to write in second pipe descriptor.
+    else closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDOUT_FILENO]);
+  }
+
+  // Check which file descriptors are open and replace the respective ones.
+  for (int descriptorIndex = 0; descriptorIndex < 2; ++descriptorIndex) {
+    for (int fdIndex = 0; fdIndex < 2; ++fdIndex) {
+      if (isOpen(descriptor[descriptorIndex][fdIndex])) {
+        if (!setupPipeDescriptor(descriptor[descriptorIndex][fdIndex], fdIndex))
+        {
+          return false;
+        }
+      }
+    }
+  }
+  /*if (isOpen(descriptor[FIRST_PIPE_FD][STDIN_FILENO])) {
+    setupPipeDescriptor(descriptor[FIRST_PIPE_FD][STDIN_FILENO]);
+  }
+  if (isOpen(descriptor[FIRST_PIPE_FD][STDOUT_FILENO])) {
+    setupPipeDescriptor(descriptor[FIRST_PIPE_FD][STDOUT_FILENO]);
+  }
+  if (isOpen(descriptor[SECOND_PIPE_FD][STDIN_FILENO])) {
+    setupPipeDescriptor(descriptor[SECOND_PIPE_FD][STDIN_FILENO]);
+  }
+  if (isOpen(descriptor[SECOND_PIPE_FD][STDOUT_FILENO])) {
+    setupPipeDescriptor(descriptor[SECOND_PIPE_FD][STDOUT_FILENO]);
+  }*/
+
+  // Array that contains: [job name, args..., NULL].
+  char *jobArgs [job.args.size() + 2];
+  jobArgs[0] = (char *) job.exec.c_str();
+  for (int i = 1; i <= job.args.size(); ++i) {
+    jobArgs[i] = (char *) job.args[i - 1].c_str();
+  }
+  // "The list of arguments must be terminated by a NULL pointer, and, since
+  // these are variadic functions, this pointer must be cast (char *) NULL."
+  jobArgs[job.args.size() + 1] = NULL;
+
+  if (execvp(jobArgs[0], jobArgs) == ERROR_OCURRED) return false;
+  else return true;
+  /*closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDIN_FILENO]);
+  closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDOUT_FILENO]);
+  closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDIN_FILENO]);
+  closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDOUT_FILENO]);
+  printf("%s\n", job.exec.c_str());*/
+}
+
+bool
+initializePipe(pipe_desc pipeToInit, vector <job_desc> &jobs) {
+  printf("## Output %s ##\n", pipeToInit.name.c_str());
   int originalInput, originalOutput;
   if (pipeToInit.input != STD_IN) {
     originalInput = replaceFileDescriptor(STDIN_FILENO,
                                           pipeToInit.input.c_str(), O_RDWR);
+    if (originalInput == ERROR_OCURRED) return false;
   }
   if (pipeToInit.output != STD_OUT) {
     originalOutput = replaceFileDescriptor(STDOUT_FILENO,
                                            pipeToInit.output.c_str(),
                                            O_RDWR | O_CREAT);
+    if (originalOutput == ERROR_OCURRED) return false;
   }
   // FORKS Y la vuelta aquí
   // Creo las dos tuberías en el proceso padre, debería cerrarla en el hijo
   // que no vaya a utilizar.
-  int descriptors1[2], descriptors2[2];
-  pipe(descriptors1);
-  pipe(descriptors2);
-  pid_t lastChild;
+  int descriptor[2][2];
+  if (pipe(descriptor[FIRST_PIPE_FD]) == ERROR_OCURRED) return false;
+  if (pipe(descriptor[SECOND_PIPE_FD]) == ERROR_OCURRED) return false;
+
+  vector <pid_t> childJobs;
   int jobsCount = pipeToInit.jobsIndexes.size();
   for (int i = 0; i < jobsCount; ++i) {
-    lastChild = fork();
-    if (lastChild == -1) {
-      // TODO Fork failed
-    }
-    else if (lastChild == 0) {
-      executeProcess(descriptors1, descriptors2, pipeToInit.jobsIndexes[i],
-                     jobsCount);
-      exit(EXIT_SUCCESS);
-    }
-    else {
-      // Soy el padre.
+    pid_t currentChild;
+    int jobIndex;
+    job_desc currentJob;
+    switch ((currentChild = fork())) {
+      case ERROR_OCURRED:
+        return false;
+      case 0:
+        jobIndex = pipeToInit.jobsIndexes[i];
+        currentJob = jobs[jobIndex];
+        if (!executeProcess(descriptor, i, jobsCount, currentJob)) exit(errno);
+        else exit(EXIT_SUCCESS);
+        break;
+      default:
+        childJobs.push_back(currentChild);
+        break;
     }
   }
-  close(descriptors1[0]);
-  close(descriptors1[1]);
-  close(descriptors2[0]);
-  close(descriptors2[1]);
-  int status;
-  waitpid(lastChild, &status, 0);
-  /*int x;
-  scanf("%d", &x);
-  printf("%d\n", x + 10);*/
+  closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDIN_FILENO]);
+  closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDOUT_FILENO]);
+  closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDIN_FILENO]);
+  closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDOUT_FILENO]);
+
+  return waitForChildren(childJobs);
 }
 
 int
@@ -129,19 +252,43 @@ main(int argc, char **argv) {
   vector <pipe_desc> pipes;
   if (!checkArgs(argc)) return 0;
   if (!loadFile(jobs, pipes, argv[1])) return 0;
-  vector <pid_t> pipesCreators;
-  bool parent = true;
-  for (int i = 0; i < pipes.size() && parent; ++i) {
-    pid_t child = fork();
-    if (child != 0) pipesCreators.push_back(child);
-    else {
-      initializePipe(pipes[i]);
-      parent = false;
+  vector <pid_t> pipeCreators;
+  for (int i = 0; i < pipes.size(); ++i) {
+    pid_t child;
+    switch (child = fork()) {
+      case ERROR_OCURRED:
+        // An error ocurred while trying to fork.
+        break;
+      case 0:
+        if (!initializePipe(pipes[i], jobs)) exit(errno);
+        else exit(EXIT_SUCCESS);
+      default:
+        pipeCreators.push_back(child);
+        break;
     }
   }
-  for (int i = 0; i < pipesCreators.size() && parent; ++i) {
+  for (int i = 0; i < pipeCreators.size(); ++i) {
+    pipe_desc exitedPipe = pipes[i];
+    pid_t exitedPipeId = pipeCreators[i];
     int status;
-    waitpid(pipesCreators[i], &status, 0);
+    if (waitpid(exitedPipeId, &status, 0) == exitedPipeId) {
+      // Returns true if the child terminated normally.
+      if (WIFEXITED(status)) {
+        // Returns the exit status of the child.
+        int code = WEXITSTATUS(status);
+        if (code != EXIT_SUCCESS) {
+          printResult(false, exitedPipe.name, code);
+        }
+        else printResult(true, exitedPipe.name, code);
+      }
+      // Returns true if the child process was terminated by a signal.
+      else if (WIFSIGNALED(status)) {
+        // Returns the number of the signal that caused the child process to
+        // terminate.
+        int signalCode = WTERMSIG(status);
+        printResult(false, exitedPipe.name, signalCode);
+      }
+    }
   }
   return 0;
   /*// Process id to do fork.

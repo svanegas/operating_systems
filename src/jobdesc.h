@@ -16,6 +16,9 @@ extern const std::string STD_OUT;
 extern const std::string STD_ERR;
 extern const std::string WRITE_MODE;
 extern const std::string READ_MODE;
+extern const int FD_CLOSED;
+extern const int FIRST_PIPE_FD;
+extern const int SECOND_PIPE_FD;
 
 struct job_desc {
   std::string name, exec;

@@ -23,6 +23,9 @@ const string STD_IN      = "stdin";
 const string STD_OUT     = "stdout";
 const string WRITE_MODE  = "w";
 const string READ_MODE   = "r";
+const int FD_CLOSED      = -1;
+const int FIRST_PIPE_FD  = 0;
+const int SECOND_PIPE_FD = 1;
 
 /**
   Method that uses 'yaml-cpp' library to parse a YAML file and fill a vector of
