@@ -5,29 +5,41 @@ Jobs :
   - Name : "job2"
     Exec : "tr"
     Args : [" ","_"]
-  - Name : "job3"
-    Exec : "yes"
-    Args : ["No","I’m", "not!"]
-  - Name : "job4"
-    Exec : "head"
-    Args : []
-  - Name : "wc"
-    Exec : "wc"
-    Args : []
+#  - Name : "job3"
+#    Exec : "yes"
+#    Args : ["No","I’m", "not!"]
+#  - Name : "job4"
+#    Exec : "head"
+#    Args : []
+#  - Name : "wc"
+#    Exec : "wc"
+#    Args : []
 #  - Name : "cat"
 #    Exec : "cat"
 #    Args : []
 #  - Name : "job7"
 #    Exec : "echo"
 #    Args : ["La", "puta","lora"]
-  - Name : "wc2"
-    Exec : "wc"
-    Args : []
+#  - Name : "wc2"
+#    Exec : "wc"
+#    Args : []
+  - Name : "ls"
+    Exec : "ls"
+    Args : ["-l"]
+#  - Name : "head"
+#    Exec : "head"
+#    Args : ["-3"]
+#  - Name : "tail"
+#    Exec : "tail"
+#    Args : ["-1"]
+  - Name : "grep"
+    Exec : "grep"
+    Args : ["^.....w"]
 Pipes :
-  - Name : "pipe1"
-    Pipe : [ "job1", "job2", "wc", "wc2"]
-    input : "stdin"
-    output : "stdout"
+#  - Name : "pipe1"
+#    Pipe : [ "job1", "job2", "wc", "wc2"]
+#    input : "stdin"
+#    output : "stdout"
 #  - Name : "pipe2"
 #    Pipe : [ "job3","job4" ]
 #    input : "stdin"
@@ -36,3 +48,11 @@ Pipes :
 #    Pipe : [ "job7","wc", "wc2"]
 #    input : "stdin"
 #    output : "stdout"
+#  - Name : "pipe4"
+#    Pipe : [ "ls", "head", "tail"]
+#    input : "stdin"
+#    output : "stdout"
+  - Name : "pipe5"
+    Pipe : ["ls", "grep"]
+    input : "stdin"
+    output : "stdout"
