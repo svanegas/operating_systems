@@ -9,6 +9,8 @@
 #include <errno.h>
 #include <string>
 #include <set>
+#include <map>
+#include <fstream>
 #include "jobdesc.h"
 
 using namespace std;
@@ -57,7 +59,7 @@ bool loadFile(vector<job_desc> &jobs, vector<pipe_desc> &pipes,
 void printResult(bool success, string pipeName, int code) {
   printf("## %s finished ", pipeName.c_str());
   if (success) printf("successfully ##\n");
-  else printf("unsuccessfully (Err: %d) ##\n", code);
+  else printf("unsuccessfully (Err: %d - %s) ##\n", code, strerror(code));
 }
 
 /**
@@ -113,32 +115,28 @@ bool setupPipeDescriptor(int pipeDescriptor, int fdToReplace) {
 
 /**
   Receives a vector of processes ids and waits for each one of them to finish.
-  @param children Reference to a vector of processes ids (pid_t).
-  @return true if all processes exited successfully, false otherwise.
+  @param child Reference to the child process id to wait.
+  @return true if child process exited successfully, false otherwise.
  */
-bool waitForChildren(vector <pid_t> &children) {
-  pid_t pid;
-  for (int i = 0; i < children.size(); ++i) {
-    pid = children[i];
-    int status;
-    if (waitpid(pid, &status, 0) == pid) {
-      // Returns true if the child terminated normally.
-      if (WIFEXITED(status)) {
-        // Returns the exit status of the child.
-        int code = WEXITSTATUS(status);
-        if (code != EXIT_SUCCESS) {
-          errno = code;
-          return false;
-        }
-      }
-      // Returns true if the child process was terminated by a signal.
-      else if (WIFSIGNALED(status)) {
-        // Returns the number of the signal that caused the child process to
-        // terminate.
-        int signalCode = WTERMSIG(status);
-        errno = signalCode;
+bool waitForChild(pid_t child) {
+  int status;
+  if (waitpid(child, &status, 0) == child) {
+    // Returns true if the child terminated normally.
+    if (WIFEXITED(status)) {
+      // Returns the exit status of the child.
+      int code = WEXITSTATUS(status);
+      if (code != EXIT_SUCCESS) {
+        errno = code;
         return false;
       }
+    }
+    // Returns true if the child process was terminated by a signal.
+    else if (WIFSIGNALED(status)) {
+      // Returns the number of the signal that caused the child process to
+      // terminate.
+      int signalCode = WTERMSIG(status);
+      errno = signalCode;
+      return false;
     }
   }
   return true;
@@ -167,135 +165,40 @@ pipe_desc buildDefaultPipe(int jobCount, set <int> &assignedJobs) {
   return defaultPipe;
 }
 
-/*bool executeProcess(int descriptor[2][2], int jobPosition, int jobsCount,
-                    job_desc job) {
-  // Even processes don't read from first pipe descriptor neither write to
-  // second pipe descriptor.
-  if (jobPosition % 2 == 0) {
-    closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDIN_FILENO]);
-    closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDOUT_FILENO]);
-  }
-  // Odd processes don't read from second pipe descriptor neither write to
-  // first pipe descriptor.
-  else if (jobPosition % 2 == 1) {
-    closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDOUT_FILENO]);
-    closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDIN_FILENO]);
-  }
-  // First process is supposed to read from second pipe descriptor because it
-  // is even, but it shouldn't read from a pipe descriptor.
-  if (jobPosition == 0) {
-    closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDIN_FILENO]);
-  }
-  // Last process is supposed to write to a pipe descriptor because it
-  // is even or odd, but it shouldn't write to a pipe descriptor.
-  if (jobPosition == jobsCount - 1) {
-    // If last is even, it was supposed to write in first pipe descriptor.
-    if (jobPosition % 2 == 0) {
-      closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDOUT_FILENO]);
-    }
-    // If last is odd, it was supposed to write in second pipe descriptor.
-    else closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDOUT_FILENO]);
-  }
+/**
+  Creates all temporal files for each pipe. A single pipe will write it's
+  output to a temporal file and the root process will wait for each process to
+  finish, so that he can print the output for that pipe reading it from the
+  temporal file. That is made to avoid a mixure of outputs in standard stream.
+  @param pipes Reference to the vector of pipes, each pipe will contain the
+               name of the temporal file in the 'tempOutput' attribute.
+  @return true if temporal files were created successfully, false otherwise.
+ */
+bool createTemporalFiles(vector<pipe_desc> &pipes) {
+  // Create the temporal directory with neccesary permissions.
+  if (mkdir(TEMP_DIR.c_str(), S_IRWXU | S_IRWXG |
+                              S_IROTH | S_IXOTH) == ERROR_OCURRED) return false;
 
-  // Check which file descriptors are open and replace the respective ones.
-  for (int descriptorIndex = 0; descriptorIndex < 2; ++descriptorIndex) {
-    for (int fdIndex = 0; fdIndex < 2; ++fdIndex) {
-      if (isOpen(descriptor[descriptorIndex][fdIndex])) {
-        if (!setupPipeDescriptor(descriptor[descriptorIndex][fdIndex], fdIndex))
-        {
-          return false;
-        }
-      }
-    }
-  }*/
-
-  /** COMMENTED **/
-  /*if (isOpen(descriptor[FIRST_PIPE_FD][STDIN_FILENO])) {
-    setupPipeDescriptor(descriptor[FIRST_PIPE_FD][STDIN_FILENO]);
+  for (int i = 0; i < pipes.size(); ++i) {
+    string temporalName = pipes[i].tempOutput;
+    ofstream ofs(temporalName.c_str());
+    ofs.close();
   }
-  if (isOpen(descriptor[FIRST_PIPE_FD][STDOUT_FILENO])) {
-    setupPipeDescriptor(descriptor[FIRST_PIPE_FD][STDOUT_FILENO]);
-  }
-  if (isOpen(descriptor[SECOND_PIPE_FD][STDIN_FILENO])) {
-    setupPipeDescriptor(descriptor[SECOND_PIPE_FD][STDIN_FILENO]);
-  }
-  if (isOpen(descriptor[SECOND_PIPE_FD][STDOUT_FILENO])) {
-    setupPipeDescriptor(descriptor[SECOND_PIPE_FD][STDOUT_FILENO]);
-  }*/
-  /** END COMMENTED **/
+  return true;
+}
 
-  // Array that contains: [job name, args..., NULL].
-  /*char *jobArgs [job.args.size() + 2];
-  jobArgs[0] = (char *) job.exec.c_str();
-  for (int i = 1; i <= job.args.size(); ++i) {
-    jobArgs[i] = (char *) job.args[i - 1].c_str();
+/**
+  Deletes all temporal files that were used by each pipe to print it's output,
+  also, it deletes the tmp folder.
+  @param pipes Pipes that used a temporal file.
+ */
+void deleteTemporalFiles(vector<pipe_desc> &pipes) {
+  for (int i = 0; i < pipes.size(); ++i) {
+    string temporalName = pipes[i].tempOutput;
+    remove(temporalName.c_str());
   }
-  // "The list of arguments must be terminated by a NULL pointer, and, since
-  // these are variadic functions, this pointer must be cast (char *) NULL."
-  jobArgs[job.args.size() + 1] = NULL;
-
-  if (execvp(jobArgs[0], jobArgs) == ERROR_OCURRED) return false;
-  else return true;*/
-
-  /** COMMENTED **/
-  /*closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDIN_FILENO]);
-  closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDOUT_FILENO]);
-  closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDIN_FILENO]);
-  closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDOUT_FILENO]);
-  printf("%s\n", job.exec.c_str());*/
-  /** END COMMENTED **/
-/*}*/
-
-/*bool initializePipe(pipe_desc pipeToInit, vector <job_desc> &jobs) {
-  int originalInput, originalOutput;
-  if (pipeToInit.input != STD_IN) {
-    originalInput = redirectStreamToFile(STDIN_FILENO, pipeToInit.input.c_str(),
-                                         O_RDWR);
-    if (originalInput == ERROR_OCURRED) return false;
-  }
-  if (pipeToInit.output != STD_OUT) {
-    originalOutput = redirectStreamToFile(STDOUT_FILENO,
-                                          pipeToInit.output.c_str(),
-                                          O_RDWR | O_CREAT);
-    if (originalOutput == ERROR_OCURRED) return false;
-  }
-  // FORKS Y la vuelta aquí
-  // Creo las dos tuberías en el proceso padre, debería cerrarla en el hijo
-  // que no vaya a utilizar.
-  int descriptor[2][2];
-  if (pipe(descriptor[FIRST_PIPE_FD]) == ERROR_OCURRED) return false;
-  if (pipe(descriptor[SECOND_PIPE_FD]) == ERROR_OCURRED) return false;
-
-  //vector <pid_t> childJobs;
-  pid_t lastJob;
-  int jobsCount = pipeToInit.jobsIndexes.size();
-  for (int i = 0; i < jobsCount; ++i) {
-    pid_t currentChild;
-    int jobIndex;
-    job_desc currentJob;
-    switch (currentChild = fork()) {
-      case ERROR_OCURRED:
-        return false;
-      case 0:
-        jobIndex = pipeToInit.jobsIndexes[i];
-        currentJob = jobs[jobIndex];
-        if (!executeProcess(descriptor, i, jobsCount, currentJob)) exit(errno);
-        else exit(EXIT_SUCCESS);
-        break;
-      default:
-        //childJobs.push_back(currentChild);
-        lastJob = currentChild;
-        break;
-    }
-  }
-  closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDIN_FILENO]);
-  closeFileDescriptor(descriptor[FIRST_PIPE_FD][STDOUT_FILENO]);
-  closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDIN_FILENO]);
-  closeFileDescriptor(descriptor[SECOND_PIPE_FD][STDOUT_FILENO]);
-
-  vector <pid_t> lastJobInVector(1, lastJob);
-  return waitForChildren(lastJobInVector);
-}*/
+  rmdir(TEMP_DIR.c_str());
+}
 
 /**
   Connects the process with a pipe for input and output if possible, and
@@ -308,7 +211,7 @@ pipe_desc buildDefaultPipe(int jobCount, set <int> &assignedJobs) {
   @return On success, returns true. On error, returns false and errno is set
           appropriately.
  */
-bool executeProcessN(int descriptor[][2], int jobPosition, int jobsCount,
+bool executeProcess(int descriptor[][2], int jobPosition, int jobsCount,
                      job_desc job) {
   // Take input from previous pipe if possible.
   if (jobPosition > 0) {
@@ -350,20 +253,23 @@ bool executeProcessN(int descriptor[][2], int jobPosition, int jobsCount,
   @return true if initializing and running the pipe was successfully, false
           otherwise.
  */
-bool initializePipeN(pipe_desc pipeToInit, vector <job_desc> &allJobs) {
+bool initializePipe(pipe_desc pipeToInit, vector <job_desc> &allJobs) {
   int originalInput, originalOutput;
+
+  // Redirect input if needed.
   if (pipeToInit.input != STD_IN) {
     originalInput = redirectStreamToFile(STDIN_FILENO, pipeToInit.input.c_str(),
                                          O_RDWR);
     if (originalInput == ERROR_OCURRED) return false;
   }
-  if (pipeToInit.output != STD_OUT) {
-    originalOutput = redirectStreamToFile(STDOUT_FILENO,
-                                          pipeToInit.output.c_str(),
-                                          O_RDWR | O_CREAT);
-    if (originalOutput == ERROR_OCURRED) return false;
-  }
-  // FORKS Y la vuelta aquí
+
+  // Always redirect output to temporal file.
+  originalOutput = redirectStreamToFile(STDOUT_FILENO,
+                                        pipeToInit.tempOutput.c_str(),
+                                        O_RDWR | O_CREAT);
+  if (originalOutput == ERROR_OCURRED) return false;
+
+  // Prepare jobs to execute.
   int jobsCount = pipeToInit.jobsIndexes.size();
   // If the pipe doesn't have any associated job so we're done.
   if (jobsCount == 0) return true;
@@ -394,7 +300,7 @@ bool initializePipeN(pipe_desc pipeToInit, vector <job_desc> &allJobs) {
       case 0:
         jobIndex = pipeToInit.jobsIndexes[i];
         currentJob = allJobs[jobIndex];
-        if (!executeProcessN(descriptor, i, jobsCount, currentJob)) exit(errno);
+        if (!executeProcess(descriptor, i, jobsCount, currentJob)) exit(errno);
         else exit(EXIT_SUCCESS);
         break;
       default:
@@ -411,9 +317,24 @@ bool initializePipeN(pipe_desc pipeToInit, vector <job_desc> &allJobs) {
       closeFileDescriptor(descriptor[i][STDOUT_FILENO]);
     }
   }
+  return waitForChild(lastJob);
+}
 
-  vector <pid_t> lastJobInVector(1, lastJob);
-  return waitForChildren(lastJobInVector);
+/**
+  Receives a pipe description which has already finished it's execution and
+  prints the output that it generated in the temporal file.
+  @param pipeToPrint Pipe to print it's output.
+ */
+void printPipeResults(int status, pipe_desc pipeToPrint) {
+  printf("## Output %s ##\n", pipeToPrint.name.c_str());
+  string temporalName = pipeToPrint.tempOutput;
+  ifstream ifs;
+  ifs.open(temporalName.c_str());
+  if (ifs.is_open()) {
+    string line;
+    while (getline(ifs, line)) printf("%s\n", line.c_str());
+    ifs.close();
+  }
 }
 
 /**
@@ -422,25 +343,20 @@ bool initializePipeN(pipe_desc pipeToInit, vector <job_desc> &allJobs) {
   @param exitedPipeId Parent pipe process id to wait and analyze.
   @param pipeName Name of the pipe to print in messages.
  */
-void analyzePipeResults(pid_t exitedPipeId, string pipeName) {
-  int status;
-  if (waitpid(exitedPipeId, &status, 0) == exitedPipeId) {
-    // Returns true if the child terminated normally.
-    if (WIFEXITED(status)) {
-      // Returns the exit status of the child.
-      int code = WEXITSTATUS(status);
-      if (code != EXIT_SUCCESS) {
-        printResult(false, pipeName, code);
-      }
-      else printResult(true, pipeName, code);
-    }
-    // Returns true if the child process was terminated by a signal.
-    else if (WIFSIGNALED(status)) {
-      // Returns the number of the signal that caused the child process to
-      // terminate.
-      int signalCode = WTERMSIG(status);
-      printResult(false, pipeName, signalCode);
-    }
+void analyzeExitStatus(int status, string pipeName) {
+  // Returns true if the child terminated normally.
+  if (WIFEXITED(status)) {
+    // Returns the exit status of the child.
+    int code = WEXITSTATUS(status);
+    if (code != EXIT_SUCCESS) printResult(false, pipeName, code);
+    else printResult(true, pipeName, code);
+  }
+  // Returns true if the child process was terminated by a signal.
+  else if (WIFSIGNALED(status)) {
+    // Returns the number of the signal that caused the child process to
+    // terminate.
+    int signalCode = WTERMSIG(status);
+    printResult(false, pipeName, signalCode);
   }
 }
 
@@ -452,15 +368,13 @@ void analyzePipeResults(pid_t exitedPipeId, string pipeName) {
  */
 pid_t forkToCreatePipe(pipe_desc pipeToCreate, vector <job_desc> &allJobs) {
   pid_t child;
-  printf("## Output %s ##\n", pipeToCreate.name.c_str());
   switch (child = fork()) {
     case ERROR_OCURRED:
       // An error ocurred while trying to fork.
       printResult(false, pipeToCreate.name, errno);
       break;
     case 0:
-      //if (!initializePipe(pipeToCreate, jobs)) exit(errno);
-      if (!initializePipeN(pipeToCreate, allJobs)) exit(errno);
+      if (!initializePipe(pipeToCreate, allJobs)) exit(errno);
       else exit(EXIT_SUCCESS);
     break;
   }
@@ -479,26 +393,44 @@ main(int argc, char **argv) {
   // Loads data into jobs, pipes and assignedJobs from the YAML file specified
   // in arguments.
   if (!loadFile(jobs, pipes, argv[1], assignedJobs)) return 0;
-  // Stores the process ids of each parent pipe processes.
-  vector <pid_t> pipeCreators;
+
+  createTemporalFiles(pipes);
+
+  // Map from process id to pipe. Used to get the pipe that finished in the
+  // wait function.
+  map <pid_t, pipe_desc> pidToPipe;
   for (int i = 0; i < pipes.size(); ++i) {
     // Execute current pipe.
     pid_t child = forkToCreatePipe(pipes[i], jobs);
-    if (child > 0) pipeCreators.push_back(child);
-  }
-  for (int i = 0; i < pipeCreators.size(); ++i) {
-    pipe_desc exitedPipe = pipes[i];
-    pid_t exitedPipeId = pipeCreators[i];
-    // Wait for current pipe to finish.
-    analyzePipeResults(exitedPipeId, exitedPipe.name);
+    if (child > 0) {
+      pidToPipe[child] = pipes[i];
+    }
   }
 
   // Take all jobs that were not executed in any pipe and run them in a default
   // pipe.
   pipe_desc defaultPipe = buildDefaultPipe(jobs.size(), assignedJobs);
   if (!defaultPipe.jobsIndexes.empty()) {
+    defaultPipe.tempOutput = TEMP_DIR + DEFAULT_PIPE + TEMP_EXT;
     pid_t defaultPipeChild = forkToCreatePipe(defaultPipe, jobs);
-    analyzePipeResults(defaultPipeChild, defaultPipe.name);
+    if (defaultPipeChild > 0) pidToPipe[defaultPipeChild] = defaultPipe;
   }
+
+  // Wait for each pipe and when it finishes print the corresponding output.
+  int exitedPipes = 0;
+  while (exitedPipes++ < pidToPipe.size()) {
+    int status;
+    pid_t exitedPipeId = wait(&status);
+    if (exitedPipeId != ERROR_OCURRED) {
+      pipe_desc pipeToPrint = pidToPipe[exitedPipeId];
+      printPipeResults(status, pipeToPrint);
+      analyzeExitStatus(status, pipeToPrint.name);
+    }
+  }
+
+  // Add default pipe before calling delete temporal files, so that it can
+  // find and delete the temporal file that default pipe used;
+  pipes.push_back(defaultPipe);
+  deleteTemporalFiles(pipes);
   return 0;
 }

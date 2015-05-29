@@ -15,6 +15,8 @@ extern const std::string STD_IN;
 extern const std::string STD_OUT;
 extern const std::string STD_ERR;
 extern const std::string DEFAULT_PIPE;
+extern const std::string TEMP_DIR;
+extern const std::string TEMP_EXT;
 extern const int FD_CLOSED;
 extern const int FIRST_PIPE_FD;
 extern const int SECOND_PIPE_FD;
@@ -31,7 +33,7 @@ struct job_desc {
   This structure stores the information of a pipe.
   */
 struct pipe_desc {
-  std::string name, input, output;
+  std::string name, input, output, tempOutput;
   std::vector <int> jobsIndexes;
 };
 
@@ -50,4 +52,10 @@ struct pipe_desc {
 bool loadFromYAML(std::vector <job_desc> &jobs, std::vector <pipe_desc> &pipes,
                   char* fileName, std::set<int> &assignedJobs);
 
+/**
+  Utility to convert an integer into a string.
+  @param x Integer value to convert into string.
+  @return String representation of x.
+ */
+std::string toStr(int x);
 #endif

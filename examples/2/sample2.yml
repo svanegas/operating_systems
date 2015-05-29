@@ -1,7 +1,16 @@
-- Job :
-  - Name : "test-job-2"
+Jobs :
+  - Name : "custom-job"
     Exec : "./bin/2/sample2_src"
     Args : ["10"]
-    Input : "./examples/2/in.txt"
-    Output : "./examples/2/out.txt"
-    Error : "./examples/2/err.txt"
+  - Name : "custom-job_delay"
+    Exec : "./bin/2/delay2_src"
+    Args : []
+Pipes:
+  - Name : "delay"
+    Pipe : [ "custom-job_delay" ]
+    input : "stdin"
+    output : "stdout"
+  - Name : "my-pipe"
+    Pipe : [ "custom-job" ]
+    input : "stdin"
+    output : "stdout"

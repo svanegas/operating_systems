@@ -21,9 +21,22 @@ const string OUTPUT_ATTR  = "output";
 const string STD_IN       = "stdin";
 const string STD_OUT      = "stdout";
 const string DEFAULT_PIPE = "default-pipe";
+const string TEMP_DIR     = "./tmp/";
+const string TEMP_EXT     = ".tmp";
 const int FD_CLOSED       = -1;
 const int FIRST_PIPE_FD   = 0;
 const int SECOND_PIPE_FD  = 1;
+
+/**
+  Utility to convert an integer into a string.
+  @param x Integer value to convert into string.
+  @return String representation of x.
+*/
+std::string toStr(int x) {
+  stringstream converter;
+  converter << x;
+  return converter.str();
+}
 
 /**
   Method that uses 'yaml-cpp' library to parse a YAML file and fill a vector of
@@ -82,9 +95,13 @@ bool parsePipes(vector <pipe_desc> &pipes, YAML::Node &rootNode,
   YAML::Node pipesNode;
   // If 'Pipes' doesn't exist in the YAML, we can't proceed.
   if (!(pipesNode = rootNode[PIPES_ATTR])) return false;
+  // Index for each temporal file.
+  int tempIndex = 0;
   for (YAML::const_iterator pipesIt = pipesNode.begin();
        pipesIt != pipesNode.end(); ++pipesIt) {
     pipe_desc currentPipe;
+    // Set the temporal index to the pipe.
+    currentPipe.tempOutput = (TEMP_DIR + toStr(tempIndex++) + TEMP_EXT);
     YAML::Node currentPipeNode = *pipesIt;
     // If required attribute doesn't exist return false.
     if (!currentPipeNode[NAME_ATTR]) return false;

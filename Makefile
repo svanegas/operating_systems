@@ -11,9 +11,9 @@ YAMLFLAG=lyaml-cpp
 # Default is build
 all: build
 
-run: build #buildsamples
+run: build buildsamples
 	@$(BINPATH)$(FILENAME) $(EXAMPLESPATH)$(SAMPLE1)
-	@#$(BINPATH)$(FILENAME) $(EXAMPLESPATH)$(SAMPLE2)
+	@$(BINPATH)$(FILENAME) $(EXAMPLESPATH)$(SAMPLE2)
 
 build: clean $(SRCPATH)$(FILENAME).cpp $(SRCPATH)$(HEADER).cpp
 	@mkdir $(BINPATH)
@@ -23,6 +23,7 @@ build: clean $(SRCPATH)$(FILENAME).cpp $(SRCPATH)$(HEADER).cpp
 buildsamples: cleansample2outerr $(EXAMPLESPATH)$(SAMPLE2SRC).cpp
 	@mkdir -p $(BINPATH)/2
 	@g++ $(EXAMPLESPATH)$(SAMPLE2SRC).cpp -o $(BINPATH)$(SAMPLE2SRC)
+	@g++ $(EXAMPLESPATH)/2/delay2_src.cpp -o $(BINPATH)/2/delay2_src
 
 clean:
 	@rm -rf $(BINPATH)/2
