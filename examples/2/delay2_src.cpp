@@ -9,6 +9,6 @@ using namespace std;
 
 int main() {
   sleep(5);
-  puts("delay 5 secs");
+  puts("Delay 5 seconds");
   exit(EXIT_SUCCESS);
 }
