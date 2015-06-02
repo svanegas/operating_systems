@@ -21,7 +21,8 @@ build: clean $(SRCPATH)$(FILENAME).cpp $(SRCPATH)$(HEADER).cpp
 	@g++ $(SRCPATH)$(FILENAME).cpp $(SRCPATH)$(HEADER).cpp\
 			 -o $(BINPATH)$(FILENAME) -$(YAMLFLAG)
 
-buildsamples: cleansample2out $(EXAMPLESPATH)$(SAMPLE2SRC).cpp
+buildsamples: cleansample2out $(EXAMPLESPATH)$(SAMPLE2SRC).cpp \
+							$(EXAMPLESPATH)$(SAMPLE2DELAY).cpp
 	@mkdir -p $(BINPATH)/2
 	@g++ $(EXAMPLESPATH)$(SAMPLE2SRC).cpp -o $(BINPATH)$(SAMPLE2SRC)
 	@g++ $(EXAMPLESPATH)$(SAMPLE2DELAY).cpp -o $(BINPATH)$(SAMPLE2DELAY)

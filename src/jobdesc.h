@@ -18,8 +18,6 @@ extern const std::string DEFAULT_PIPE;
 extern const std::string TEMP_DIR;
 extern const std::string TEMP_EXT;
 extern const int FD_CLOSED;
-extern const int FIRST_PIPE_FD;
-extern const int SECOND_PIPE_FD;
 
 /**
   This structure stores the information of a job.

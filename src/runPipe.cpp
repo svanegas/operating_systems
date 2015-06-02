@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <stdio.h>
 #include <unistd.h>
@@ -60,7 +61,7 @@ bool loadFile(vector<job_desc> &jobs, vector<pipe_desc> &pipes,
 void printResult(bool success, string pipeName, int code) {
   printf("## %s finished ", pipeName.c_str());
   if (success) printf("successfully ##\n");
-  else printf("unsuccessfully (Err: %d - %s) ##\n", code, strerror(code));
+  else printf("unsuccessfully (Err: %d) ##\n", code);
 }
 
 /**
@@ -175,8 +176,8 @@ pipe_desc buildDefaultPipe(int jobCount, set <int> &assignedJobs) {
  */
 bool createTemporalFiles(vector<pipe_desc> &pipes) {
   // Create the temporal directory with neccesary permissions.
-  if (mkdir(TEMP_DIR.c_str(), S_IRWXU | S_IRWXG |
-                              S_IROTH | S_IXOTH) == ERROR_OCURRED) return false;
+  if (mkdir(TEMP_DIR.c_str(), S_IRWXU | S_IRWXG | S_IROTH | 
+            S_IXOTH) == ERROR_OCURRED) return false;
 
   for (int i = 0; i < pipes.size(); ++i) {
     string temporalName = pipes[i].tempOutput;
@@ -213,6 +214,8 @@ void deleteTemporalFiles(vector<pipe_desc> &pipes) {
 bool executeProcess(int descriptor[][2], int jobPosition, int jobsCount,
                      job_desc job) {
   // Take input from previous pipe if possible.
+  // The current process needs to read from the previous pipe, not to write on
+  // it. That's why it closes the output slot and enables the input slot.
   if (jobPosition > 0) {
     closeFileDescriptor(descriptor[jobPosition - 1][STDOUT_FILENO]);
     if (!setupPipeDescriptor(descriptor[jobPosition - 1][STDIN_FILENO],
@@ -244,7 +247,7 @@ bool executeProcess(int descriptor[][2], int jobPosition, int jobsCount,
 /**
   Redirects the input and output streams for a given pipe if needed, does as
   many forks as number of jobs in the pipe, executing them handling required
-  files descriptors and waiting until the last job in the pipe finishes it's
+  files descriptors and waiting until the last job in the pipe finishes its
   execution.
   @param pipeToInit Description of the pipe to initialize.
   @param allJobs Reference to vector that contains all jobs (also those which
@@ -325,7 +328,7 @@ bool initializePipe(pipe_desc pipeToInit, vector <job_desc> &allJobs) {
   prints the output that it generated in the temporal file.
   @param pipeToPrint Pipe to print it's output.
  */
-void printPipeResults(int status, pipe_desc pipeToPrint) {
+void printPipeResults(pipe_desc pipeToPrint) {
   printf("## Output %s ##\n", pipeToPrint.name.c_str());
   string temporalName = pipeToPrint.tempOutput;
   // To read from temporal file, use an input file stream.
@@ -336,19 +339,16 @@ void printPipeResults(int status, pipe_desc pipeToPrint) {
   if (pipeToPrint.output != STD_OUT) ofs.open(pipeToPrint.output.c_str());
   if (ifs.is_open()) {
     string line;
-    while (getline(ifs, line)) {
-      // If we have to write in a file, do it.
-      if (ofs.is_open()) ofs << line << endl;
-      else printf("%s\n", line.c_str());
-    }
+    // If we have to write in a file, do it.
+    if (ofs.is_open()) while (getline(ifs, line)) ofs << line << endl;
+    else while (getline(ifs, line)) printf("%s\n", line.c_str());
     ifs.close();
   }
   if (ofs.is_open()) ofs.close();
 }
 
 /**
-  Receives a parent pipe process id and waits until it finishes it execution,
-  then, checks for its exit status and prints a message according to it.
+  Checks for the received exit status and prints a message according to it.
   @param exitedPipeId Parent pipe process id to wait and analyze.
   @param pipeName Name of the pipe to print in messages.
  */
@@ -380,7 +380,6 @@ pid_t forkAndCreatePipe(pipe_desc pipeToCreate, vector <job_desc> &allJobs) {
   switch (child = fork()) {
     case ERROR_OCURRED:
       // An error ocurred while trying to fork.
-      //printResult(false, pipeToCreate.name, errno);
       return ERROR_OCURRED;
     case 0:
       if (!initializePipe(pipeToCreate, allJobs)) exit(errno);
@@ -432,14 +431,14 @@ main(int argc, char **argv) {
   int exitedPipes = 0;
   while (exitedPipes++ < pidToPipe.size()) {
     int status;
-    // This wait will catch the first pipe-process that terminates its
+    // This wait will catch the first pipe-master that terminates its
     // execution.
     pid_t exitedPipeId = wait(&status);
     // If the wait didn't fail, proceed to show the results of the finished
     // process.
     if (exitedPipeId != ERROR_OCURRED) {
       pipe_desc pipeToPrint = pidToPipe[exitedPipeId];
-      printPipeResults(status, pipeToPrint);
+      printPipeResults(pipeToPrint);
       analyzeExitStatus(status, pipeToPrint.name);
     }
   }

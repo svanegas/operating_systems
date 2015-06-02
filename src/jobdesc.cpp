@@ -24,8 +24,6 @@ const string DEFAULT_PIPE = "default-pipe";
 const string TEMP_DIR     = "./tmp/";
 const string TEMP_EXT     = ".tmp";
 const int FD_CLOSED       = -1;
-const int FIRST_PIPE_FD   = 0;
-const int SECOND_PIPE_FD  = 1;
 
 /**
   Utility to convert an integer into a string.
