@@ -45,12 +45,12 @@ follow the steps given in [the official site] or follow the provided here.
 
 ### yaml-cpp installation
 - Make sure you have CMake installed, if you don't, install it with:
-> **Ubuntu:** `$ sudo apt-get install cmake`<br />
+> **Ubuntu:** `$ sudo apt-get install cmake`  
 > **Red Hat/Fedora:** `$ sudo yum install cmake`
 
 - In order to install *yaml-cpp* library you must have *libboost-all-dev*
 package installed too, so execute:
-> **Ubuntu:** `$ sudo apt-get install libboost-all-dev`<br />
+> **Ubuntu:** `$ sudo apt-get install libboost-all-dev`  
 > **Red Hat/Fedora:** `$ sudo yum install libboost-all-dev`
 
 - Clone the *[yaml-cpp]* repository or download the [source package] and
