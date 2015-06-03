@@ -13,14 +13,14 @@ structure:
 
 ```sh
 Jobs :
-- Name : <Job Name>
-Exec : <Executable>
-Args : [<Arguments>]
+  - Name : <Job Name>
+    Exec : <Executable>
+    Args : [<Arguments>]
 Pipes :
-- Name : <Pipe Name>
-Pipe : [<Jobs>]
-input : <Input>
-output : <Output>
+  - Name : <Pipe Name>
+    Pipe : [<Jobs>]
+    input : <Input>
+    output : <Output>
 ```
 
 The options that the job should have are:
@@ -45,13 +45,13 @@ follow the steps given in [the official site] or follow the provided here.
 
 ### yaml-cpp installation
 - Make sure you have CMake installed, if you don't, install it with:
->> **Ubuntu:** `$ sudo apt-get install cmake`<br />
->> **Red Hat/Fedora:** `$ sudo yum install cmake`
+> **Ubuntu:** `$ sudo apt-get install cmake`<br />
+> **Red Hat/Fedora:** `$ sudo yum install cmake`
 
 - In order to install *yaml-cpp* library you must have *libboost-all-dev*
 package installed too, so execute:
->> **Ubuntu:** `$ sudo apt-get install libboost-all-dev`<br />
->> **Red Hat/Fedora:** `$ sudo yum install libboost-all-dev`
+> **Ubuntu:** `$ sudo apt-get install libboost-all-dev`<br />
+> **Red Hat/Fedora:** `$ sudo yum install libboost-all-dev`
 
 - Clone the *[yaml-cpp]* repository or download the [source package] and
 extract it.
@@ -100,23 +100,23 @@ Given this YAML file saved in the current working directory as
 __*sample1.yml*__:
 ```sh
 Jobs :
-- Name : "job1"
-Exec : "echo"
-Args : ["you", "gotta","be","kidding"]
-- Name : "job2"
-Exec : "tr"
-Args : [" ","_"]
-- Name : "job3"
-Exec : "yes"
-Args : ["No","I’m", "not!"]
-- Name : "job4"
-Exec : "head"
-Args : []
+  - Name : "job1"
+    Exec : "echo"
+    Args : ["you", "gotta","be","kidding"]
+  - Name : "job2"
+    Exec : "tr"
+    Args : [" ","_"]
+  - Name : "job3"
+    Exec : "yes"
+    Args : ["No","I’m", "not!"]
+  - Name : "job4"
+    Exec : "head"
+    Args : []
 Pipes :
-- Name : "pipe1"
-Pipe : [ "job1","job2" ]
-input : "stdin"
-output : "stdout"
+  - Name : "pipe1"
+    Pipe : [ "job1","job2" ]
+    input : "stdin"
+    output : "stdout"
 ```
 , and running the command:
 ```sh
