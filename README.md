@@ -45,36 +45,32 @@ follow the steps given in [the official site] or follow the provided here.
 
 ### yaml-cpp installation
 - Make sure you have CMake installed, if you don't, install it with:
-> **Ubuntu:** `$ sudo apt-get install cmake`  
-> **Red Hat/Fedora:** `$ sudo yum install cmake`
+> **Ubuntu:**  
+>`$ sudo apt-get install cmake`  
+> **Red Hat/Fedora:**  
+`$ sudo yum install cmake`
 
 - In order to install *yaml-cpp* library you must have *libboost-all-dev*
 package installed too, so execute:
-> **Ubuntu:** `$ sudo apt-get install libboost-all-dev`  
-> **Red Hat/Fedora:** `$ sudo yum install libboost-all-dev`
+> **Ubuntu:**  
+> `$ sudo apt-get install libboost-all-dev`  
+> **Red Hat/Fedora:**  
+> `$ sudo yum install libboost-all-dev`
 
 - Clone the *[yaml-cpp]* repository or download the [source package] and
 extract it.
 (**Note:** The *yaml-cpp* version used in this project was **0.5.1**)
-```sh
-$ git clone https://github.com/jbeder/yaml-cpp.git
-```
+> `$ git clone https://github.com/jbeder/yaml-cpp.git`
 - Step into the extracted directory or the cloned repository.
-```sh
-$ cd yaml-cpp
-```
+> `$ cd yaml-cpp`
 - Create a *build* directory and step into it.
-```sh
-$ mkdir build
-$ cd build
-```
+> `$ mkdir build`  
+> `$ cd build`
 - Run the following commands to prepare and finish the installation of the
 library.
-```sh
-$ cmake ..
-$ make
-$ sudo make install
-```
+> `$ cmake ..`  
+> `$ make`  
+> `$ sudo make install`
 
 Now you can compile and run the program as follows.
 
