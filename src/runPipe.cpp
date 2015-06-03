@@ -1,5 +1,3 @@
-
-#include <iostream>
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -176,7 +174,7 @@ pipe_desc buildDefaultPipe(int jobCount, set <int> &assignedJobs) {
  */
 bool createTemporalFiles(vector<pipe_desc> &pipes) {
   // Create the temporal directory with neccesary permissions.
-  if (mkdir(TEMP_DIR.c_str(), S_IRWXU | S_IRWXG | S_IROTH | 
+  if (mkdir(TEMP_DIR.c_str(), S_IRWXU | S_IRWXG | S_IROTH |
             S_IXOTH) == ERROR_OCURRED) return false;
 
   for (int i = 0; i < pipes.size(); ++i) {
