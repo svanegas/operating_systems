@@ -128,16 +128,16 @@ the expected output is:
 you-gotta-be-kidding
 ## pipe1 finished successfully ##
 ## Output default-pipe ##
-no I’m not!
-no I’m not!
-no I’m not!
-no I’m not!
-no I’m not!
-no I’m not!
-no I’m not!
-no I’m not!
-no I’m not!
-no I’m not!
+No I’m not!
+No I’m not!
+No I’m not!
+No I’m not!
+No I’m not!
+No I’m not!
+No I’m not!
+No I’m not!
+No I’m not!
+No I’m not!
 ## default-pipe finished successfully ##
 ```
 That is equivalent to (The order is irrelevant):
