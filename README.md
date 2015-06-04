@@ -5,8 +5,12 @@ by: [Alejandro Sánchez Aristizábal] & [Santiago Vanegas Gil]
 
 ## Overview
 
+This programming assignment is a program that given a YAML description executes
+a set of programs chaining their outputs and inputs using pipes.
+
 The *runPipe* program receives a file with jobs and pipes descriptions
 (with certain options) as input and runs it.
+.
 
 The jobs and pipes description are given in a [YAML] file with the following
 structure:
