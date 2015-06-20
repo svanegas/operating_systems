@@ -1,0 +1,22 @@
+Jobs :
+  - Name : "wait-job"
+    Exec : "./bin/2/sample2_src"
+    Args : ["3"]
+  - Name : "delay-job"
+    Exec : "./bin/2/delay2_src"
+    Args : []
+  - Name : "list-files"
+    Exec : "ls"
+    Args : []
+  - Name : "sort-results"
+    Exec : "sort"
+    Args : []
+Pipes:
+  - Name : "best-pipe"
+    Pipe : ["list-files", "sort-results"]
+    input : "stdin"
+    output : "./examples/2/out.txt"
+  - Name : "my-pipe"
+    Pipe : [ "wait-job" ]
+    input : "stdin"
+    output : "stdout"
