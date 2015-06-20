@@ -1,0 +1,26 @@
+- Se están mezclando la salida de los diferentes pipes, ¿está bien o hay
+que suprimir la concurrencia entre pipes?
+  => Hay que hacer un mecanismo para guardar la salida del programa en
+     determinado archivo y luego al final en el parent process leer de cada
+     uno de esos archivos.
+- ¿Cómo sería el funcionamiento con 2 pipes en vez de n - 1? ¿otra vez eliminar
+concurrencia entre procesos?
+  => No se puede con 2, hay que hacerlo con n - 1.
+- Si todos los jobs fueron corridos por algun pipe, i.e. el pipe por defecto no
+tiene ningún job, ¿debe mostrar ## Output default-pipe ## y ## default-pipe
+finished successfully ## ?
+  => No importa, como quiera, no nos va a joder por eso.
+- En el YAML, ¿"input" y "output" llevan mayúscula inicial?
+  => No importa, no nos jode por eso.
+- Para detectar un error en un pipe, ¿se debe preguntar solo por el último
+proceso o por cada uno de ellos?
+  => Preguntamos solo por el último.
+- ¿Dos pipes pueden tener el mismo fichero de entrada o salida?
+  => No
+- ¿Dos pipes pueden tener el mismo nombre?
+  => No me entendió la pregunta
+- ¿No se combinan las entradas si dos pipes leen del standard input?
+  => No preocupation
+- ¿El default pipe se debería ejecutarse también en paralelo con todos o al
+final de todos?
+  => Paralelo

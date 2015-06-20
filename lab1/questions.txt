@@ -1,0 +1,7 @@
+En el arreglo de Args, ¿cada item estará encerrado en comillas?
+--> ["-n","this is a test", 100, "hi"]
+--> Si sí, ¿Los ítems pueden tener comas?
+
+La ruta relativa del ejecutable especificado en el fichero YAML,
+¿se toma desde qué ubicación? Desde el punto del programa 'jobRun',
+¿correcto?
